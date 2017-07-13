@@ -22,6 +22,10 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
 
 
 public class MainActivity2 extends AppCompatActivity {
@@ -37,6 +41,11 @@ public class MainActivity2 extends AppCompatActivity {
     private int bufferSize = 0;
     private Thread recordingThread = null;
     private boolean isRecording = false;
+
+//    private int singleBufferSize = 0;
+
+    private ArrayList<short[]> dataArrayList = new ArrayList();
+    private ArrayList<short[]> finalDataArrayList = new ArrayList();
 
 
     private static final int REQUEST_RECORD_AUDIO_PERMISSION = 200;
@@ -61,10 +70,26 @@ public class MainActivity2 extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        bufferSize = AudioRecord.getMinBufferSize(8000,
+        bufferSize = AudioRecord.getMinBufferSize(16000,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT);
 
+//        singleBufferSize = AudioRecord.getMinBufferSize(16000,
+//                AudioFormat.CHANNEL_IN_MONO,
+//                AudioFormat.ENCODING_PCM_16BIT);
+
+
+        //Delete All files in Audio Recorder folder of the emulator
+//        String filepath = Environment.getExternalStorageDirectory().getPath();
+//        File file = new File(filepath,AUDIO_RECORDER_FOLDER);
+//        String[] myFiles;
+//
+//        myFiles = file.list();
+//        for (int i=0; i<myFiles.length; i++) {
+//            File myFile = new File(file, myFiles[i]);
+//            myFile.delete();
+//        }
+//        Log.v("files",Arrays.toString(myFiles));
 
         setButtonHandlers();
         enableButtons(false);
@@ -89,9 +114,9 @@ public class MainActivity2 extends AppCompatActivity {
         File file = new File(filepath,AUDIO_RECORDER_FOLDER);
 
         if(!file.exists()){
-            Log.v("Recorder","file doesnt exist (folder) in getFilename()");
+//            Log.v("Recorder","file doesnt exist (folder) in getFilename()");
             file.mkdirs();
-            Log.v("Recorder","file exists :" + file.exists());
+//            Log.v("Recorder","file exists :" + file.exists());
         }
 
         return (file.getAbsolutePath() + "/" + System.currentTimeMillis() + AUDIO_RECORDER_FILE_EXT_WAV);
@@ -116,6 +141,24 @@ public class MainActivity2 extends AppCompatActivity {
         return (file.getAbsolutePath() + "/" + AUDIO_RECORDER_TEMP_FILE);
     }
 
+    private String getTempFilename2(int fileNumber){
+        String filepath = Environment.getExternalStorageDirectory().getPath();
+        File file = new File(filepath,AUDIO_RECORDER_FOLDER);
+
+        if(!file.exists()){
+            file.mkdirs();
+        }
+
+        File tempFile = new File(filepath,fileNumber+AUDIO_RECORDER_TEMP_FILE);
+
+        if(tempFile.exists()){
+            tempFile.delete();
+        }
+        Log.v("recorder", file.getAbsolutePath() + "/" + fileNumber);
+
+        return (file.getAbsolutePath() + "/" + fileNumber+ AUDIO_RECORDER_TEMP_FILE);
+    }
+
     private void startRecording(){
         recorder = new AudioRecord(MediaRecorder.AudioSource.MIC,
                 RECORDER_SAMPLERATE, RECORDER_CHANNELS,RECORDER_AUDIO_ENCODING, bufferSize);
@@ -130,47 +173,181 @@ public class MainActivity2 extends AppCompatActivity {
 
             @Override
             public void run() {
-                writeAudioDataToFile();
+                writeAudioDataToArrayList();
+                writeAudioDataToTempFiles();
+                copyTempFilesToWavFiles();
             }
         },"AudioRecorder Thread");
+//
+//        Thread writingThread = new Thread(new Runnable() {
+//
+//            @Override
+//            public void run() {
+//                writeAudioDataToTempFiles();
+//            }
+//        },"AudioRecorder Thread writing");
 
         recordingThread.start();
+//        writingThread.start();
     }
 
-    private void writeAudioDataToFile(){
-        byte data[] = new byte[bufferSize];
-        String filename = getTempFilename();
-        FileOutputStream os = null;
+    private void writeAudioDataToArrayList(){
+//        ArrayList<byte[]> dataArrays = new ArrayList<>();
+//        int numbOfArrays = bufferSize/singleBufferSize;
+//        FileOutputStream os = null;
+//
+//        for (int i = 0;i<=numbOfArrays;i++){
+//            byte singledata[] = new byte[singleBufferSize];
+//            //TODO need to change format of naming temp file
+//            String filename = getTempFilename();
+//        }
 
-        try {
-            os = new FileOutputStream(filename);
-        } catch (FileNotFoundException e) {
-// TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+        short data[] = new short[bufferSize];
+//        String filename = getTempFilename();
+//        FileOutputStream os = null;
+
+//        try {
+//            os = new FileOutputStream(filename);
+//        } catch (FileNotFoundException e) {
+//            e.printStackTrace();
+//        }
 
         int read = 0;
 
-        if(null != os){
+//        if(null != os){
             while(isRecording){
+
                 read = recorder.read(data, 0, bufferSize);
+//                read = recorder.read(data,0,singleBufferSize);
 
                 if(AudioRecord.ERROR_INVALID_OPERATION != read){
-                    try {
-                        os.write(data);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+//                    try {
+                        //TODO parse data array to fit into more than one array then loop and write those into wav vfiles
+//                        Log.v("recorder" ,data.length+"");
+//                        Log.v("recorder" , Arrays.toString(data));
+                        dataArrayList.add(data);
+
+//                        os.write(data);
+//                    } catch (IOException e) {
+//                        e.printStackTrace();
+//                    }
                 }
             }
 
+//            try {
+//                os.close();
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//        }
+    }
+
+    private void writeAudioDataToTempFiles(){
+        short data[];
+        String filename;
+        reorganiseDataArray(flattenArray());
+
+//        Log.v("finalArray","final Data Array size :" + finalDataArrayList.size());
+//        Log.v("finalArray", "first element size in final data Array :" + finalDataArrayList.get(0).length);
+        for (int fileNumber = 0; fileNumber < finalDataArrayList.size() ; fileNumber++){
+
+            ObjectOutputStream os = null;
+            filename = getTempFilename2(fileNumber);
+//            Log.v("recorder",filename+":"+fileNumber);
+            data = finalDataArrayList.get(fileNumber);
+            if(fileNumber==0){
+                Log.v("arrays","writeAudioDataToTempFiles:(finalDataArrayList[0]) : "+ Arrays.toString(finalDataArrayList.get(0)));
+            }
+//            Log.v("AudioDebug","finalDataArrayList size : " + finalDataArrayList.size());
+
             try {
-                os.close();
+                os = new ObjectOutputStream(new FileOutputStream(filename));
+
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
             } catch (IOException e) {
                 e.printStackTrace();
             }
+
+            if(null != os){
+                try {
+//                    Log.v("arrays" , "writeAudioDataToTempFiles: "+fileNumber+"--> "+ data.length);
+                    os.writeObject(data);
+
+//                    for (int i = 0; i < data.length; i++) {
+//                        os.writeShort(data[i]);
+//                    }
+//                    os.write(data);
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                try {
+
+                    os.close();
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
+
+
+
     }
+
+    private ArrayList<Short> flattenArray(){
+        ArrayList<Short> flattenedDataArrayList = new ArrayList();
+        short [] tempArray;
+        for (int i = 0; i < dataArrayList.size() ; i++){
+            tempArray = dataArrayList.remove(i);
+            for (int j = 0; j<tempArray.length;j++){
+                flattenedDataArrayList.add(tempArray[j]);
+            }
+        }
+        return flattenedDataArrayList;
+    }
+
+    private void reorganiseDataArray(ArrayList<Short> flattenedDataArrayList){
+        //finalDataArrayList
+        int i = 0 ;
+        int singleArrayCounter = 1;
+        short [] tempArray;
+        int sampleArraySize = RECORDER_SAMPLERATE * 5;
+        while(i<flattenedDataArrayList.size()){
+            //if the counter is less than the number of samples to be saved in each single array
+            switch (singleArrayCounter){
+                //sampleRate*durationOfOneSample = Size of array
+                case 1:tempArray = new short[sampleArraySize];
+                    tempArray[singleArrayCounter - 1] = flattenedDataArrayList.get(i).shortValue();
+                    finalDataArrayList.add(tempArray);
+                    singleArrayCounter++;
+                    break;
+                case RECORDER_SAMPLERATE:tempArray = finalDataArrayList.get(finalDataArrayList.size()-1);
+                    tempArray[singleArrayCounter - 1] = flattenedDataArrayList.get(i).shortValue();
+                    singleArrayCounter = 1;
+                    break;
+                default:tempArray = finalDataArrayList.get(finalDataArrayList.size()-1);
+                    tempArray[singleArrayCounter - 1] = flattenedDataArrayList.get(i).shortValue();
+                    singleArrayCounter++;
+                    break;
+
+            }
+            i++;
+        }
+
+    }
+
+    private void copyTempFilesToWavFiles() {
+
+        for (int fileNumber = 0; fileNumber < finalDataArrayList.size(); fileNumber++) {
+            copyWaveFile(getTempFilename2(fileNumber), getFilename());
+//            deleteTempFile2(fileNumber);
+        }
+
+    }
+
 
     private void stopRecording(){
         if(null != recorder){
@@ -185,8 +362,15 @@ public class MainActivity2 extends AppCompatActivity {
             recordingThread = null;
         }
 
-        copyWaveFile(getTempFilename(),getFilename());
-        deleteTempFile();
+//        copyWaveFile(getTempFilename(),getFilename());
+//        deleteTempFile();
+//
+//        for (int fileNumber = 0;fileNumber < finalDataArrayList.size();fileNumber++){
+//            copyWaveFile(getTempFilename2(fileNumber),getFilename());
+//            deleteTempFile2(fileNumber);
+//        }
+
+
     }
 
     private void deleteTempFile() {
@@ -195,31 +379,47 @@ public class MainActivity2 extends AppCompatActivity {
         file.delete();
     }
 
+    private void deleteTempFile2(int fileNumber) {
+        File file = new File(getTempFilename2(fileNumber));
+
+        file.delete();
+    }
+
     private void copyWaveFile(String inFilename,String outFilename){
-        FileInputStream in = null;
-        FileOutputStream out = null;
+//        FileInputStream in = null;
+//        FileOutputStream out = null;
+        ObjectInputStream in = null;
+        ObjectOutputStream out = null;
         long totalAudioLen = 0;
         long totalDataLen = totalAudioLen + 36;
         long longSampleRate = RECORDER_SAMPLERATE;
         int channels = 1; // was originally 2
         long byteRate = RECORDER_BPP * RECORDER_SAMPLERATE * channels/8;
 
-        byte[] data = new byte[bufferSize];
+
+
+        short[] data = new short[bufferSize];
 
         try {
-            in = new FileInputStream(inFilename);
-            out = new FileOutputStream(outFilename);
-            totalAudioLen = in.getChannel().size();
+            in = new ObjectInputStream(new FileInputStream(inFilename));
+            out = new ObjectOutputStream(new FileOutputStream(outFilename));
+//            totalAudioLen = in.getChannel().size();
+            totalAudioLen = 16*40000;
             totalDataLen = totalAudioLen + 36;
+//
+////            AppLog.logString("File size: " + totalDataLen);
+//
+            WriteWaveFileHeader(out, totalAudioLen, totalDataLen, longSampleRate, channels, byteRate);
+//
 
-//            AppLog.logString("File size: " + totalDataLen);
+//            for (int i = 0;(in.read()!=-1) && i<data.length; i++) {
+//                short singleData = in.readShort();
+//                data[i] = singleData;
+//                out.writeShort(singleData);
+//            }
+            data = (short[]) in.readObject();
+            out.writeObject(data);
 
-            WriteWaveFileHeader(out, totalAudioLen, totalDataLen,
-                    longSampleRate, channels, byteRate);
-
-            while(in.read(data) != -1){
-                out.write(data);
-            }
 
             in.close();
             out.close();
@@ -227,11 +427,14 @@ public class MainActivity2 extends AppCompatActivity {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
         }
     }
 
+
     private void WriteWaveFileHeader(
-            FileOutputStream out, long totalAudioLen,
+            ObjectOutputStream out, long totalAudioLen,
             long totalDataLen, long longSampleRate, int channels,
             long byteRate) throws IOException {
 
