@@ -42,8 +42,6 @@ public class MainActivity2 extends AppCompatActivity {
     private Thread recordingThread = null;
     private boolean isRecording = false;
 
-//    private int singleBufferSize = 0;
-
     private ArrayList<short[]> dataArrayList = new ArrayList();
     private ArrayList<short[]> finalDataArrayList = new ArrayList();
 
@@ -69,15 +67,11 @@ public class MainActivity2 extends AppCompatActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        //TODO arrays created for wav file should have overriding data
 
         bufferSize = AudioRecord.getMinBufferSize(16000,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT);
-
-//        singleBufferSize = AudioRecord.getMinBufferSize(16000,
-//                AudioFormat.CHANNEL_IN_MONO,
-//                AudioFormat.ENCODING_PCM_16BIT);
-
 
         //Delete All files in Audio Recorder folder of the emulator
 //        String filepath = Environment.getExternalStorageDirectory().getPath();
@@ -178,68 +172,24 @@ public class MainActivity2 extends AppCompatActivity {
                 copyTempFilesToWavFiles();
             }
         },"AudioRecorder Thread");
-//
-//        Thread writingThread = new Thread(new Runnable() {
-//
-//            @Override
-//            public void run() {
-//                writeAudioDataToTempFiles();
-//            }
-//        },"AudioRecorder Thread writing");
 
         recordingThread.start();
-//        writingThread.start();
     }
 
     private void writeAudioDataToArrayList(){
-//        ArrayList<byte[]> dataArrays = new ArrayList<>();
-//        int numbOfArrays = bufferSize/singleBufferSize;
-//        FileOutputStream os = null;
-//
-//        for (int i = 0;i<=numbOfArrays;i++){
-//            byte singledata[] = new byte[singleBufferSize];
-//            //TODO need to change format of naming temp file
-//            String filename = getTempFilename();
-//        }
 
         short data[] = new short[bufferSize];
-//        String filename = getTempFilename();
-//        FileOutputStream os = null;
-
-//        try {
-//            os = new FileOutputStream(filename);
-//        } catch (FileNotFoundException e) {
-//            e.printStackTrace();
-//        }
-
         int read = 0;
 
-//        if(null != os){
             while(isRecording){
 
                 read = recorder.read(data, 0, bufferSize);
-//                read = recorder.read(data,0,singleBufferSize);
 
                 if(AudioRecord.ERROR_INVALID_OPERATION != read){
-//                    try {
-                        //TODO parse data array to fit into more than one array then loop and write those into wav vfiles
-//                        Log.v("recorder" ,data.length+"");
-//                        Log.v("recorder" , Arrays.toString(data));
                         dataArrayList.add(data);
 
-//                        os.write(data);
-//                    } catch (IOException e) {
-//                        e.printStackTrace();
-//                    }
                 }
             }
-
-//            try {
-//                os.close();
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-//        }
     }
 
     private void writeAudioDataToTempFiles(){
@@ -318,7 +268,6 @@ public class MainActivity2 extends AppCompatActivity {
         while(i<flattenedDataArrayList.size()){
             //if the counter is less than the number of samples to be saved in each single array
             switch (singleArrayCounter){
-                //sampleRate*durationOfOneSample = Size of array
                 case 1:tempArray = new short[sampleArraySize];
                     tempArray[singleArrayCounter - 1] = flattenedDataArrayList.get(i).shortValue();
                     finalDataArrayList.add(tempArray);
@@ -343,7 +292,7 @@ public class MainActivity2 extends AppCompatActivity {
 
         for (int fileNumber = 0; fileNumber < finalDataArrayList.size(); fileNumber++) {
             copyWaveFile(getTempFilename2(fileNumber), getFilename());
-//            deleteTempFile2(fileNumber);
+            deleteTempFile2(fileNumber);
         }
 
     }
@@ -362,20 +311,11 @@ public class MainActivity2 extends AppCompatActivity {
             recordingThread = null;
         }
 
-//        copyWaveFile(getTempFilename(),getFilename());
-//        deleteTempFile();
-//
-//        for (int fileNumber = 0;fileNumber < finalDataArrayList.size();fileNumber++){
-//            copyWaveFile(getTempFilename2(fileNumber),getFilename());
-//            deleteTempFile2(fileNumber);
-//        }
-
 
     }
 
     private void deleteTempFile() {
         File file = new File(getTempFilename());
-
         file.delete();
     }
 
@@ -396,9 +336,7 @@ public class MainActivity2 extends AppCompatActivity {
         int channels = 1; // was originally 2
         long byteRate = RECORDER_BPP * RECORDER_SAMPLERATE * channels/8;
 
-
-
-        short[] data = new short[bufferSize];
+        short[] data;
 
         try {
             in = new ObjectInputStream(new FileInputStream(inFilename));
@@ -406,20 +344,11 @@ public class MainActivity2 extends AppCompatActivity {
 //            totalAudioLen = in.getChannel().size();
             totalAudioLen = 16*40000;
             totalDataLen = totalAudioLen + 36;
-//
-////            AppLog.logString("File size: " + totalDataLen);
-//
-            WriteWaveFileHeader(out, totalAudioLen, totalDataLen, longSampleRate, channels, byteRate);
-//
 
-//            for (int i = 0;(in.read()!=-1) && i<data.length; i++) {
-//                short singleData = in.readShort();
-//                data[i] = singleData;
-//                out.writeShort(singleData);
-//            }
+            WriteWaveFileHeader(out, totalAudioLen, totalDataLen, longSampleRate, channels, byteRate);
+
             data = (short[]) in.readObject();
             out.writeObject(data);
-
 
             in.close();
             out.close();
@@ -493,7 +422,6 @@ public class MainActivity2 extends AppCompatActivity {
         public void onClick(View v) {
             switch(v.getId()){
                 case R.id.btnStart:{
-//                    AppLog.logString("Start Recording");
                     Log.v("Status","Start Recording");
 
                     enableButtons(true);
@@ -502,7 +430,6 @@ public class MainActivity2 extends AppCompatActivity {
                     break;
                 }
                 case R.id.btnStop:{
-//                    AppLog.logString("Start Recording");
                     Log.v("Status","Stop Recording");
 
                     enableButtons(false);
