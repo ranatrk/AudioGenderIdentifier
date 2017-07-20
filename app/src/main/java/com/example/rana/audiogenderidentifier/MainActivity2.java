@@ -17,6 +17,8 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
+import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -26,7 +28,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-
 
 public class MainActivity2 extends AppCompatActivity {
     private static final int RECORDER_BPP = 16; // bits per sample
@@ -45,11 +46,21 @@ public class MainActivity2 extends AppCompatActivity {
     private ArrayList<short[]> dataArrayList = new ArrayList();
     private ArrayList<short[]> finalDataArrayList = new ArrayList();
 
-
     private static final int REQUEST_RECORD_AUDIO_PERMISSION = 200;
     // Requesting permission to RECORD_AUDIO
     private boolean permissionToRecordAccepted = false;
     private String [] permissions = {Manifest.permission.RECORD_AUDIO};
+
+    //Tensorflow :
+    static {
+        System.loadLibrary("tensorflow_inference");
+    }
+
+    private static final String MODEL_FILE = "file:///android_asset/optimized_tfdroid.pb";
+    private static final String INPUT_NODE = "I";
+    private static final String OUTPUT_NODE = "O";
+    private static final int[] INPUT_SIZE = {1,3};
+    private TensorFlowInferenceInterface inferenceInterface;
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -73,6 +84,12 @@ public class MainActivity2 extends AppCompatActivity {
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT);
 
+        setButtonHandlers();
+        enableButtons(false);
+
+        inferenceInterface = new TensorFlowInferenceInterface();
+        inferenceInterface.initializeTensorFlow(getAssets(), MODEL_FILE);
+
         //Delete All files in Audio Recorder folder of the emulator
 //        String filepath = Environment.getExternalStorageDirectory().getPath();
 //        File file = new File(filepath,AUDIO_RECORDER_FOLDER);
@@ -85,8 +102,6 @@ public class MainActivity2 extends AppCompatActivity {
 //        }
 //        Log.v("files",Arrays.toString(myFiles));
 
-        setButtonHandlers();
-        enableButtons(false);
     }
 
     private void setButtonHandlers() {
@@ -276,6 +291,8 @@ public class MainActivity2 extends AppCompatActivity {
                 case RECORDER_SAMPLERATE:tempArray = finalDataArrayList.get(finalDataArrayList.size()-1);
                     tempArray[singleArrayCounter - 1] = flattenedDataArrayList.get(i).shortValue();
                     singleArrayCounter = 1;
+                    //TODO should the overlap be 80 samples as sample rate is 8Khz
+                    i -= 80-1;
                     break;
                 default:tempArray = finalDataArrayList.get(finalDataArrayList.size()-1);
                     tempArray[singleArrayCounter - 1] = flattenedDataArrayList.get(i).shortValue();
@@ -310,7 +327,6 @@ public class MainActivity2 extends AppCompatActivity {
             recorder = null;
             recordingThread = null;
         }
-
 
     }
 
@@ -440,4 +456,21 @@ public class MainActivity2 extends AppCompatActivity {
             }
         }
     };
+
+
+    private void useTensorFlow(){
+        float[] inputFloats = {1, 3, 4};
+        int arraySize = finalDataArrayList.get(0).length;
+        int [] array = {1,arraySize};
+        //TODO needs input a float,double,int  or byte array not a short
+//        inferenceInterface.fillNodeFloat(INPUT_NODE,array,finalDataArrayList.get(0));
+//        inferenceInterface.
+//
+//        inferenceInterface.runInference(new String[] {OUTPUT_NODE});
+
+        float[] result = {0, 0};
+        inferenceInterface.readNodeFloat(OUTPUT_NODE, result);
+    }
+
+
 }
