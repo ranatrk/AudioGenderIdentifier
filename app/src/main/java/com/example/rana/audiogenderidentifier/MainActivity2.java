@@ -44,7 +44,7 @@ public class MainActivity2 extends AppCompatActivity {
     private boolean isRecording = false;
 
     private ArrayList<short[]> dataArrayList = new ArrayList();
-    private ArrayList<short[]> finalDataArrayList = new ArrayList();
+    private ArrayList<int[]> finalDataArrayList = new ArrayList();
 
     private static final int REQUEST_RECORD_AUDIO_PERMISSION = 200;
     // Requesting permission to RECORD_AUDIO
@@ -87,9 +87,10 @@ public class MainActivity2 extends AppCompatActivity {
         setButtonHandlers();
         enableButtons(false);
 
-        inferenceInterface = new TensorFlowInferenceInterface();
-        inferenceInterface.initializeTensorFlow(getAssets(), MODEL_FILE);
+//        inferenceInterface = new TensorFlowInferenceInterface();
+//        inferenceInterface.initializeTensorFlow(getAssets(), MODEL_FILE);
 
+        tensorFlowSample();
         //Delete All files in Audio Recorder folder of the emulator
 //        String filepath = Environment.getExternalStorageDirectory().getPath();
 //        File file = new File(filepath,AUDIO_RECORDER_FOLDER);
@@ -183,8 +184,9 @@ public class MainActivity2 extends AppCompatActivity {
             @Override
             public void run() {
                 writeAudioDataToArrayList();
-                writeAudioDataToTempFiles();
-                copyTempFilesToWavFiles();
+                reorganiseDataArray(flattenArray());
+//                writeAudioDataToTempFiles();
+//                copyTempFilesToWavFiles();
             }
         },"AudioRecorder Thread");
 
@@ -207,10 +209,53 @@ public class MainActivity2 extends AppCompatActivity {
             }
     }
 
+    private ArrayList<Integer> flattenArray(){
+        ArrayList<Integer> flattenedDataArrayList = new ArrayList();
+        short [] tempArray;
+        for (int i = 0; i < dataArrayList.size() ; i++){
+            tempArray = dataArrayList.remove(i);
+            for (int j = 0; j<tempArray.length;j++){
+                flattenedDataArrayList.add((int)tempArray[j]);
+            }
+        }
+        return flattenedDataArrayList;
+    }
+
+    private void reorganiseDataArray(ArrayList<Integer> flattenedDataArrayList){
+        //finalDataArrayList
+        int i = 0 ;
+        int singleArrayCounter = 1;
+        int [] tempArray;
+        int sampleArraySize = RECORDER_SAMPLERATE * 5;
+        while(i<flattenedDataArrayList.size()){
+            //if the counter is less than the number of samples to be saved in each single array
+            switch (singleArrayCounter){
+                case 1:tempArray = new int[sampleArraySize];
+                    tempArray[singleArrayCounter - 1] = flattenedDataArrayList.get(i).intValue();
+                    finalDataArrayList.add(tempArray);
+                    singleArrayCounter++;
+                    break;
+                case RECORDER_SAMPLERATE:tempArray = finalDataArrayList.get(finalDataArrayList.size()-1);
+                    tempArray[singleArrayCounter - 1] = flattenedDataArrayList.get(i).intValue();
+                    singleArrayCounter = 1;
+                    //TODO should the overlap be 80 samples as sample rate is 8Khz
+                    i -= 80-1;
+                    break;
+                default:tempArray = finalDataArrayList.get(finalDataArrayList.size()-1);
+                    tempArray[singleArrayCounter - 1] = flattenedDataArrayList.get(i).intValue();
+                    singleArrayCounter++;
+                    break;
+
+            }
+            i++;
+        }
+
+    }
+
     private void writeAudioDataToTempFiles(){
-        short data[];
+       //TODO data was short [] and wasnt tested with making it int []
+        int data[];
         String filename;
-        reorganiseDataArray(flattenArray());
 
 //        Log.v("finalArray","final Data Array size :" + finalDataArrayList.size());
 //        Log.v("finalArray", "first element size in final data Array :" + finalDataArrayList.get(0).length);
@@ -262,49 +307,6 @@ public class MainActivity2 extends AppCompatActivity {
 
     }
 
-    private ArrayList<Short> flattenArray(){
-        ArrayList<Short> flattenedDataArrayList = new ArrayList();
-        short [] tempArray;
-        for (int i = 0; i < dataArrayList.size() ; i++){
-            tempArray = dataArrayList.remove(i);
-            for (int j = 0; j<tempArray.length;j++){
-                flattenedDataArrayList.add(tempArray[j]);
-            }
-        }
-        return flattenedDataArrayList;
-    }
-
-    private void reorganiseDataArray(ArrayList<Short> flattenedDataArrayList){
-        //finalDataArrayList
-        int i = 0 ;
-        int singleArrayCounter = 1;
-        short [] tempArray;
-        int sampleArraySize = RECORDER_SAMPLERATE * 5;
-        while(i<flattenedDataArrayList.size()){
-            //if the counter is less than the number of samples to be saved in each single array
-            switch (singleArrayCounter){
-                case 1:tempArray = new short[sampleArraySize];
-                    tempArray[singleArrayCounter - 1] = flattenedDataArrayList.get(i).shortValue();
-                    finalDataArrayList.add(tempArray);
-                    singleArrayCounter++;
-                    break;
-                case RECORDER_SAMPLERATE:tempArray = finalDataArrayList.get(finalDataArrayList.size()-1);
-                    tempArray[singleArrayCounter - 1] = flattenedDataArrayList.get(i).shortValue();
-                    singleArrayCounter = 1;
-                    //TODO should the overlap be 80 samples as sample rate is 8Khz
-                    i -= 80-1;
-                    break;
-                default:tempArray = finalDataArrayList.get(finalDataArrayList.size()-1);
-                    tempArray[singleArrayCounter - 1] = flattenedDataArrayList.get(i).shortValue();
-                    singleArrayCounter++;
-                    break;
-
-            }
-            i++;
-        }
-
-    }
-
     private void copyTempFilesToWavFiles() {
 
         for (int fileNumber = 0; fileNumber < finalDataArrayList.size(); fileNumber++) {
@@ -313,7 +315,6 @@ public class MainActivity2 extends AppCompatActivity {
         }
 
     }
-
 
     private void stopRecording(){
         if(null != recorder){
@@ -362,7 +363,7 @@ public class MainActivity2 extends AppCompatActivity {
             totalDataLen = totalAudioLen + 36;
 
             WriteWaveFileHeader(out, totalAudioLen, totalDataLen, longSampleRate, channels, byteRate);
-
+            //TODO data should be int
             data = (short[]) in.readObject();
             out.writeObject(data);
 
@@ -464,12 +465,39 @@ public class MainActivity2 extends AppCompatActivity {
         int [] array = {1,arraySize};
         //TODO needs input a float,double,int  or byte array not a short
 //        inferenceInterface.fillNodeFloat(INPUT_NODE,array,finalDataArrayList.get(0));
-//        inferenceInterface.
-//
 //        inferenceInterface.runInference(new String[] {OUTPUT_NODE});
 
+        inferenceInterface.fillNodeInt(INPUT_NODE,array,finalDataArrayList.get(0));
+        inferenceInterface.runInference(new String[] {OUTPUT_NODE});
+        //TODO declare and initialize the result array with what size
         float[] result = {0, 0};
         inferenceInterface.readNodeFloat(OUTPUT_NODE, result);
+    }
+
+
+    public void tensorFlowSample(){
+        float num1 = 0.0f;
+        float num2 = 3.33f;
+        float num3 = 1.2f;
+
+        String MODEL_FILE = "file:///android_asset/optimized_tfdroid2.pb";
+        String INPUT_NODE = "I";
+        String OUTPUT_NODE = "O";
+        int[] INPUT_SIZE = {1,3};
+
+
+        inferenceInterface = new TensorFlowInferenceInterface();
+        inferenceInterface.initializeTensorFlow(getAssets(), MODEL_FILE);
+        float[] inputFloats = {num1, num2, num3};
+
+        inferenceInterface.fillNodeFloat(INPUT_NODE, INPUT_SIZE, inputFloats);
+        inferenceInterface.runInference(new String[] {OUTPUT_NODE});
+
+
+        float[] resu = new float[2];
+        inferenceInterface.readNodeFloat(OUTPUT_NODE, resu);
+
+        Log.v("output_mode" , Arrays.toString(resu));
     }
 
 
