@@ -31,15 +31,17 @@ public class MainActivity extends AppCompatActivity {
     private Thread recordingThread = null;
     private boolean isRecording = false;
 
+    //dataArrayList --> recorded data
+    //finalDataArrayList --> divided data with overlaping bytes
     private ArrayList<short[]> dataArrayList = new ArrayList();
     private ArrayList<int[]> finalDataArrayList = new ArrayList();
 
-    private static final int REQUEST_RECORD_AUDIO_PERMISSION = 200;
     // Requesting permission to RECORD_AUDIO
+    private static final int REQUEST_RECORD_AUDIO_PERMISSION = 200;
     private boolean permissionToRecordAccepted = false;
     private String [] permissions = {Manifest.permission.RECORD_AUDIO};
 
-    //Tensorflow :
+    //Tensorflow
     static {
         System.loadLibrary("tensorflow_inference");
     }
@@ -47,6 +49,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String INPUT_NODE = "I";
     private static final String OUTPUT_NODE = "O";
     private TensorFlowInferenceInterface inferenceInterface;
+
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -60,11 +63,11 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        //TODO arrays created for wav file should have overriding data
 
         bufferSize = AudioRecord.getMinBufferSize(16000,
                 AudioFormat.CHANNEL_IN_MONO,
@@ -79,21 +82,28 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+
+    //Add listeners to start,stop recording buttons
     private void setButtonHandlers() {
         ((Button)findViewById(R.id.btnStart)).setOnClickListener(btnClick);
         ((Button)findViewById(R.id.btnStop)).setOnClickListener(btnClick);
     }
 
+
+    //Enable/Disable single button based on boolean parameter input
     private void enableButton(int id,boolean isEnable){
         ((Button)findViewById(id)).setEnabled(isEnable);
     }
 
+
+    //toggle enabling start,stop buttons
     private void enableButtons(boolean isRecording) {
         enableButton(R.id.btnStart,!isRecording);
         enableButton(R.id.btnStop,isRecording);
     }
 
-
+    //start recording audio in a new Thread
+    //call methods required to obtain the bytes and save them in required array
     private void startRecording(){
         recorder = new AudioRecord(MediaRecorder.AudioSource.MIC,
                 RECORDER_SAMPLERATE, RECORDER_CHANNELS,RECORDER_AUDIO_ENCODING, bufferSize);
@@ -110,14 +120,13 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 writeAudioDataToArrayList();
                 reorganiseDataArray(flattenArray());
-//                writeAudioDataToTempFiles();
-//                copyTempFilesToWavFiles();
             }
         },"AudioRecorder Thread");
 
         recordingThread.start();
     }
 
+    //Save data(type:short) from mic recorder to array buffers and add them to temporary dataArrayList
     private void writeAudioDataToArrayList(){
 
         short data[] = new short[bufferSize];
@@ -134,6 +143,7 @@ public class MainActivity extends AppCompatActivity {
             }
     }
 
+    //flatten  and return dataArrayList(arrayList of arrays) to one arrayList of int values of the data
     private ArrayList<Integer> flattenArray(){
         ArrayList<Integer> flattenedDataArrayList = new ArrayList();
         short [] tempArray;
@@ -146,6 +156,9 @@ public class MainActivity extends AppCompatActivity {
         return flattenedDataArrayList;
     }
 
+
+    //Regroup int values into arrays of certain size,
+    // taking into consideration Overlap of audio samples(1 sec=80 samples)
     private void reorganiseDataArray(ArrayList<Integer> flattenedDataArrayList){
         //finalDataArrayList
         int i = 0 ;
@@ -155,17 +168,20 @@ public class MainActivity extends AppCompatActivity {
         while(i<flattenedDataArrayList.size()){
             //if the counter is less than the number of samples to be saved in each single array
             switch (singleArrayCounter){
+                //First position in new Array
                 case 1:tempArray = new int[sampleArraySize];
                     tempArray[singleArrayCounter - 1] = flattenedDataArrayList.get(i).intValue();
                     finalDataArrayList.add(tempArray);
                     singleArrayCounter++;
                     break;
+                //Last position in single new Array
                 case RECORDER_SAMPLERATE:tempArray = finalDataArrayList.get(finalDataArrayList.size()-1);
                     tempArray[singleArrayCounter - 1] = flattenedDataArrayList.get(i).intValue();
                     singleArrayCounter = 1;
                     //TODO should the overlap be 80 samples as sample rate is 8Khz
                     i -= 80-1;
                     break;
+                //Intermediate positions in new Array
                 default:tempArray = finalDataArrayList.get(finalDataArrayList.size()-1);
                     tempArray[singleArrayCounter - 1] = flattenedDataArrayList.get(i).intValue();
                     singleArrayCounter++;
@@ -178,6 +194,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    //Stop recording data in Thread and close Thread
     private void stopRecording(){
         if(null != recorder){
             isRecording = false;
@@ -220,6 +237,8 @@ public class MainActivity extends AppCompatActivity {
     };
 
 
+    //Use TensorFlow model on the finalDataArrayList to return ArrayList of results
+    //reference : https://omid.al/posts/2017-02-20-Tutorial-Build-Your-First-Tensorflow-Android-App.html
     private ArrayList<float[]> useTensorFlow(int resultArrayLength){
         ArrayList<float[]> tensorflowResultArray = new ArrayList<float[]>();
 
