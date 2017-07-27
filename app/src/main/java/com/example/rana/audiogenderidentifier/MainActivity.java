@@ -45,6 +45,7 @@ public class MainActivity extends AppCompatActivity {
     static {
         System.loadLibrary("tensorflow_inference");
     }
+    //path to tensorflow model
     private static final String MODEL_FILE = "file:///android_asset/optimized_tfdroid.pb";
     private static final String INPUT_NODE = "I";
     private static final String OUTPUT_NODE = "O";
@@ -256,6 +257,7 @@ public class MainActivity extends AppCompatActivity {
         }
         return tensorflowResultArray;
 
+//        //For one array only
 //        int arraySize = finalDataArrayList.get(0).length;
 //        int [] array = {1,arraySize};
 ////        inferenceInterface.fillNodeFloat(INPUT_NODE,array,finalDataArrayList.get(0));
